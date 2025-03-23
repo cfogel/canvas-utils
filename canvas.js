@@ -1,4 +1,5 @@
 import { CANVAS_TOKEN, CANVAS_ENDPOINT } from "./config.js";
+import { appendObj } from "./utils.js";
 export const CANVAS_GET_INIT = {
     method: "GET",
     headers: {
@@ -12,7 +13,7 @@ export const canvasParams = ({ include, fields, exclude_fields, per_page, ...res
     ...(fields ? [arrayParams('response_fields', fields)] : []),
     ...(exclude_fields ? [arrayParams('exclude_response_fields', exclude_fields)] : []),
     ...(per_page ? [`per_page=${per_page}`] : []),
-    ...(Object.entries(rest).map(([k, v]) => `${k}=${v}`))
+    ...(Object.entries(rest).filter(([k,v])=>v!=undefined).map(([k, v]) => `${k}=${v}`))
 ].join('&');
 export const headers = (token, ctype) => Object.assign({
     Authorization: `Bearer ${token}`
@@ -23,6 +24,15 @@ export const getPaginated = async (resource, options, list = []) => {
     const r = await fetch(resource, options);
     const nextLink = r.headers.get('link').split(',').find(l => l.includes('rel="next"'));
     return nextLink ? getPaginated(/^<([^>]*)>/.exec(nextLink)[1], options, [...list, ...(await r.json())]) : [...list, ...(await r.json())]
+}
+export const getPaginatedObj = async (resource, options, list = {}) => {
+    const r = await fetch(resource, options);
+    const nextLink = r.headers.get('link').split(',').find(l => l.includes('rel="next"'));
+    if (nextLink) {
+        return getPaginatedObj(/^<([^>]*)>/.exec(nextLink)[1], options, appendObj(list,(await r.json())));
+    } else {
+        return appendObj(list,(await r.json()));
+    }
 }
 
 /* Assignments */
@@ -36,6 +46,13 @@ export const listCourses = ({ include, fields, exclude_fields, per_page = 100, s
 export const getCourse = (course, { include, fields, exclude_fields, ...rest } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}?${canvasParams({include,fields,exclude_fields,...rest})}`, CANVAS_GET_INIT).then(r => r.json());
 export const getCoursePermissions = (course, { permissions, fields, exclude_fields } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/permissions?${permissions ? `${arrayParams('permissions',permissions)}&` : ''}${canvasParams({fields,exclude_fields})}`, CANVAS_GET_INIT).then(r => r.json());
 export const listCourseUsers = (course, { include, fields, exclude_fields, per_page = 100, enrollment_type, users, enrollment_state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/users?${canvasParams({include,fields,exclude_fields,per_page,...rest})}${enrollment_type ? `&${arrayParams('enrollment_type',enrollment_type)}` : ''}${users ? `&${arrayParams('user_ids',users)}` : ''}${enrollment_state ? `&${arrayParams('enrollment_state',enrollment_state)}` : ''}`, CANVAS_GET_INIT);
+
+/* Grade Change Log */
+
+export const getGradeChanges = async (course, { assignment, student_id, grader_id, fields, exclude_fields, per_page = 100, ...rest } = {}) => {
+    const { events, linked } = await getPaginatedObj(`${CANVAS_ENDPOINT}/api/v1/audit/grade_change?course_id=${course}&${canvasParams({assignment_id:assignment,student_id,grader_id,fields,exclude_fields,per_page,...rest})}`, CANVAS_GET_INIT);
+    return events.map(({links:{course,student,grader,page_view,assignment},event_type,id,...rest})=>({student: linked.users?.find(({id})=>id==student)?.name, assignment: linked.assignments?.find(({id})=>id==assignment)?.name, ...rest, grader: linked.users?.find(({id})=>id==grader)?.name, id}))
+}
 
 /* Submissions */
 
