@@ -54,6 +54,8 @@ export const getGradeChanges = async (course, { assignment, student_id, grader_i
     return events.map(({links:{course,student,grader,page_view,assignment},event_type,id,...rest})=>({student: linked.users?.find(({id})=>id==student)?.name, assignment: linked.assignments?.find(({id})=>id==assignment)?.name, ...rest, grader: linked.users?.find(({id})=>id==grader)?.name, id}))
 }
 
+export const graderCounts = changes => Object.entries(Object.groupBy(changes,s=>s.grader)).map(([k,v])=>[k,[...new Set(v.map(s=>s.student))]])
+
 /* Submissions */
 
 export const updateGrades = (course, assignment, updates) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}/submissions/update_grades`, {
@@ -65,6 +67,9 @@ export const updateGrades = (course, assignment, updates) => fetch(`${CANVAS_END
 export const listSubmissions = (course, { students, assignments, include = ['user','assignment','submission_comments','submission_history'], fields, exclude_fields, per_page = 25, ...rest} = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/students/submissions?${arrayParams('student_ids',students ?? ['all'])}&${canvasParams({include,fields,exclude_fields,per_page,...rest,grouped:true})}${assignments ? `&${arrayParams('assignment_ids',assignments)}` : ''}`, CANVAS_GET_INIT).then(r => r.flatMap(s => s.submissions));
 export const getAssignmentSubmissions = (course, assignment, { include = ['user','submission_comments','submission_history'], fields, exclude_fields, per_page = 100, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}/submissions?${canvasParams({include,fields,exclude_fields,per_page,...rest})}`, CANVAS_GET_INIT);
 export const getSubmission = (course, assignment, user, { include = ['user','assignment','submission_comments','submission_history'], fields = [], exclude_fields = []} = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}/submissions/${user}?${canvasParams({include,fields,exclude_fields})}`, CANVAS_GET_INIT).then(r => r.json());
+
+export const expandSubmissionHistory = submissions => [...submissions,...submissions.filter(({attempt})=>attempt>1).flatMap(({submission_history,assignment,user,submission_comments})=>submission_history.slice(0,-1).map(s=>({...s,submission_history,submission_comments,assignment,user,old_attempt:true})))].toSorted((a,b)=>a.id-b.id)
+export const formatSubmission = ({id, user:{name} = {}, assignment:{name:assignment} = {}, ...s}) => ({id,name,assignment,...s})
 
 /* Progress */
 
