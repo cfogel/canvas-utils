@@ -7,14 +7,12 @@ export const CANVAS_GET_INIT = {
     }
 };
 
-export const arrayParams = (key, values) => `${key}[]=${values.join(`&${key}[]=`)}`;
-export const canvasParams = ({ include, fields, exclude_fields, per_page, ...rest }) => [
-    ...(include ? [arrayParams('include', include)] : []),
-    ...(fields ? [arrayParams('response_fields', fields)] : []),
-    ...(exclude_fields ? [arrayParams('exclude_response_fields', exclude_fields)] : []),
-    ...(per_page ? [`per_page=${per_page}`] : []),
-    ...(Object.entries(rest).filter(([k,v])=>v!=undefined).map(([k, v]) => `${k}=${v}`))
-].join('&');
+export const canvasParams = ({include, fields, exclude_fields, ...rest}) => new URLSearchParams([
+    ...(include ? include.map(i=>['include[]',i]) : []),
+    ...(fields ? fields.map(f=>['response_fields[]',f]) : []),
+    ...(exclude_fields ? exclude_fields.map(e=>['exclude_response_fields[]',e]) : []), 
+    ...Object.entries(rest).filter(([k,v])=>['string','number','boolean'].includes(typeof(v))), 
+    ...Object.entries(rest).filter(([k,v])=>Array.isArray(v)).flatMap(([k,vals])=>vals.map(v=>[k,v]))]);
 export const headers = (token, ctype) => Object.assign({
     Authorization: `Bearer ${token}`
 }, ctype ? {
@@ -38,14 +36,14 @@ export const getPaginatedObj = async (resource, options, list = {}) => {
 /* Assignments */
 
 export const getAssignment = (course, assignment, { include, fields, exclude_fields, ...rest } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}?${canvasParams({include,fields,exclude_fields,...rest})}`, CANVAS_GET_INIT).then(r => r.json());
-export const listAssignments = (course, { include, fields, exclude_fields, per_page = 100, assignment_ids, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments?${canvasParams({include,fields,exclude_fields,per_page,...rest})}${assignment_ids ? `&${arrayParams('assignment_ids',assignment_ids)}` : ''}`, CANVAS_GET_INIT);
+export const listAssignments = (course, { include, fields, exclude_fields, per_page = 100, assignment_ids, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments?${canvasParams({include,fields,exclude_fields,per_page,'assignment_ids[]':assignment_ids,...rest})}`, CANVAS_GET_INIT);
 
 /* Courses */
 
-export const listCourses = ({ include, fields, exclude_fields, per_page = 100, state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses?${canvasParams({include,fields,exclude_fields,per_page,...rest})}${state ? `&${arrayParams('state',state)}` : ''}`, CANVAS_GET_INIT);
+export const listCourses = ({ include, fields, exclude_fields, per_page = 100, state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses?${canvasParams({include,fields,exclude_fields,per_page,'state[]':state,...rest})}`, CANVAS_GET_INIT);
 export const getCourse = (course, { include, fields, exclude_fields, ...rest } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}?${canvasParams({include,fields,exclude_fields,...rest})}`, CANVAS_GET_INIT).then(r => r.json());
-export const getCoursePermissions = (course, { permissions, fields, exclude_fields } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/permissions?${permissions ? `${arrayParams('permissions',permissions)}&` : ''}${canvasParams({fields,exclude_fields})}`, CANVAS_GET_INIT).then(r => r.json());
-export const listCourseUsers = (course, { include, fields, exclude_fields, per_page = 100, enrollment_type, users, enrollment_state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/users?${canvasParams({include,fields,exclude_fields,per_page,...rest})}${enrollment_type ? `&${arrayParams('enrollment_type',enrollment_type)}` : ''}${users ? `&${arrayParams('user_ids',users)}` : ''}${enrollment_state ? `&${arrayParams('enrollment_state',enrollment_state)}` : ''}`, CANVAS_GET_INIT);
+export const getCoursePermissions = (course, { permissions, fields, exclude_fields } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/permissions?${canvasParams({fields,exclude_fields,'permissions[]':permissions})}`, CANVAS_GET_INIT).then(r => r.json());
+export const listCourseUsers = (course, { include, fields, exclude_fields, per_page = 100, enrollment_type, users, enrollment_state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/users?${canvasParams({include,fields,exclude_fields,per_page,'enrollment_type[]':enrollment_type,'user_ids[]':users,'enrollment_state[]':enrollment_state,...rest})}`, CANVAS_GET_INIT);
 
 /* Grade Change Log */
 
@@ -64,7 +62,7 @@ export const updateGrades = (course, assignment, updates) => fetch(`${CANVAS_END
     body: JSON.stringify(updates)
 }).then(r => r.json());
 
-export const listSubmissions = (course, { students, assignments, include = ['user','assignment','submission_comments','submission_history'], fields, exclude_fields, per_page = 25, ...rest} = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/students/submissions?${arrayParams('student_ids',students ?? ['all'])}&${canvasParams({include,fields,exclude_fields,per_page,...rest,grouped:true})}${assignments ? `&${arrayParams('assignment_ids',assignments)}` : ''}`, CANVAS_GET_INIT).then(r => r.flatMap(s => s.submissions));
+export const listSubmissions = (course, { students, assignments, include = ['user','assignment','submission_comments','submission_history'], fields, exclude_fields, per_page = 25, ...rest} = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/students/submissions?${canvasParams({include,fields,exclude_fields,per_page,'student_ids[]':students ?? ['all'],'assignment_ids[]':assignments,...rest,grouped:true})}`, CANVAS_GET_INIT).then(r => r.flatMap(s => s.submissions));
 export const getAssignmentSubmissions = (course, assignment, { include = ['user','submission_comments','submission_history'], fields, exclude_fields, per_page = 100, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}/submissions?${canvasParams({include,fields,exclude_fields,per_page,...rest})}`, CANVAS_GET_INIT);
 export const getSubmission = (course, assignment, user, { include = ['user','assignment','submission_comments','submission_history'], fields = [], exclude_fields = []} = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/assignments/${assignment}/submissions/${user}?${canvasParams({include,fields,exclude_fields})}`, CANVAS_GET_INIT).then(r => r.json());
 
