@@ -49,6 +49,7 @@ export const listCourses = ({ include, fields, exclude_fields, per_page = 100, s
 export const getCourse = (course, { include, fields, exclude_fields, ...rest } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}?${canvasParams({include,fields,exclude_fields,...rest})}`, CANVAS_GET_INIT).then(r => r.json());
 export const getCoursePermissions = (course, { permissions, fields, exclude_fields } = {}) => fetch(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/permissions?${canvasParams({fields,exclude_fields,'permissions[]':permissions})}`, CANVAS_GET_INIT).then(r => r.json());
 export const listCourseUsers = (course, { include, fields, exclude_fields, per_page = 100, enrollment_type, users, enrollment_state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/users?${canvasParams({include,fields,exclude_fields,per_page,'enrollment_type[]':enrollment_type,'user_ids[]':users,'enrollment_state[]':enrollment_state,...rest})}`, CANVAS_GET_INIT);
+export const listCourseEnrollments = (course, { include, fields, exclude_fields, per_page = 100, type, role, state, ...rest } = {}) => getPaginated(`${CANVAS_ENDPOINT}/api/v1/courses/${course}/enrollments?${canvasParams({include,fields,exclude_fields,per_page,'type[]':type,'role[]':role,'state[]':state,...rest})}`, CANVAS_GET_INIT);
 
 /* Grade Change Log */
 
